@@ -1,8 +1,8 @@
 /* Mi cartera - app privada. Todo corre en el telefono: los archivos no se suben
    a ningun lado y el historial vive en el almacenamiento local del navegador. */
-import { parseArchivo } from "./parsers.js";
-import { analizar, fusionar } from "./modelo.js";
-import { actualizarTodo } from "./cotizaciones.js";
+import { parseArchivo } from "./parsers.js?v=3";
+import { analizar, fusionar } from "./modelo.js?v=3";
+import { actualizarTodo } from "./cotizaciones.js?v=3";
 
 const K_LEDGER = "cartera.ledger.v1";
 const K_CCL = "cartera.ccl.v1";

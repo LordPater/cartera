@@ -1,8 +1,8 @@
 /* Cache offline: la app funciona sin internet una vez abierta la primera vez. */
-const CACHE = "cartera-v2";
+const CACHE = "cartera-v3";
 const ARCHIVOS = [
   "./", "./index.html", "./manifest.webmanifest", "./icono.svg",
-  "./src/app.js", "./src/modelo.js", "./src/parsers.js", "./src/cotizaciones.js",
+  "./src/app.js?v=3", "./src/modelo.js?v=3", "./src/parsers.js?v=3", "./src/cotizaciones.js?v=3",
   "./src/ccl.json", "./src/precios.json",
 ];
 
