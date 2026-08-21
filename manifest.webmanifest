@@ -1,0 +1,14 @@
+{
+  "name": "Mi cartera",
+  "short_name": "Cartera",
+  "description": "Seguimiento privado de la cartera de inversiones, en dolares",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A0A08",
+  "theme_color": "#0A0A08",
+  "orientation": "any",
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
