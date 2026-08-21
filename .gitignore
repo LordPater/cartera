@@ -1,3 +1,5 @@
 test/
 *.backup.json
 cartera-*.json
+__pycache__/
+*.pyc
