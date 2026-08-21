@@ -1,4 +1,5 @@
 test/
+.claude/
 *.backup.json
 cartera-*.json
 __pycache__/
