@@ -40,6 +40,17 @@ de Bull Market tiene una ventana móvil de un año— la app los sigue teniendo.
 Abrí el link, y en el menú del navegador elegí *Agregar a pantalla de inicio*.
 Queda como una app y funciona sin internet.
 
+## Cotizaciones
+
+Se actualizan solas, sin intervención:
+
+- **Al abrir la app**, pide el CCL a `mercados.ambito.com` y los precios a
+  `data912.com` (BYMA) y `stockanalysis.com` (NYSE/NASDAQ). Las tres permiten
+  CORS desde este dominio, así que el teléfono las consulta directo.
+- **Todos los días hábiles**, una GitHub Action refresca `src/ccl.json` y
+  `src/precios.json` en el repo. Así, aunque abras la app sin señal, los valores
+  que trae de fábrica son recientes.
+
 ## Copias de seguridad
 
 El historial vive en este teléfono. Desde la pestaña **Datos** podés guardar una

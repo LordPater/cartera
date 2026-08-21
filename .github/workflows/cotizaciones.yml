@@ -1,0 +1,32 @@
+name: Actualizar cotizaciones
+
+# Corre de lunes a viernes despues del cierre del mercado argentino
+# (21:30 UTC = 18:30 en Argentina) y tambien a mano si hace falta.
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Traer CCL y precios
+        run: python scripts/actualizar_cotizaciones.py
+
+      - name: Commitear si hubo cambios
+        run: |
+          if [[ -z "$(git status --porcelain src/)" ]]; then
+            echo "Sin cambios en las cotizaciones."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ccl.json src/precios.json
+          git commit -m "Cotizaciones al $(date -u +%d/%m/%Y)"
+          git push

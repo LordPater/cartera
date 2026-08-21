@@ -2,6 +2,7 @@
    a ningun lado y el historial vive en el almacenamiento local del navegador. */
 import { parseArchivo } from "./parsers.js";
 import { analizar, fusionar } from "./modelo.js";
+import { actualizarTodo } from "./cotizaciones.js";
 
 const K_LEDGER = "cartera.ledger.v1";
 const K_CCL = "cartera.ccl.v1";
@@ -26,6 +27,7 @@ let LEDGER = [];
 let CCL = {};
 let PRECIOS = {};
 let R = null;                       // resultado del analisis
+let estadoCotiz = null;
 const $ = id => document.getElementById(id);
 
 const guardar = () => {
@@ -47,6 +49,40 @@ async function arrancar() {
   PRECIOS = { ...(prBase.precios||{}), ...(JSON.parse(localStorage.getItem(K_PRECIOS) || "{}")) };
   LEDGER = JSON.parse(localStorage.getItem(K_LEDGER) || "[]");
   recalcular();
+  refrescarCotizaciones();          // en segundo plano, no bloquea la pantalla
+}
+
+/** Trae CCL y precios sin que el usuario tenga que hacer nada. */
+let refrescando = false;
+async function refrescarCotizaciones(manual = false) {
+  if (refrescando) return;
+  refrescando = true;
+  estadoCotiz = "buscando";
+  pintarEstadoCotiz();
+  try {
+    const tickers = [...new Set(LEDGER.map(o => o.ticker).filter(Boolean))];
+    const r = await actualizarTodo(tickers);
+    const nCCL = Object.keys(r.ccl).length, nPr = Object.keys(r.precios).length;
+    if (nCCL) CCL = { ...CCL, ...r.ccl };
+    if (nPr) PRECIOS = { ...PRECIOS, ...r.precios };
+    if (nCCL || nPr) { guardar(); recalcular(); }
+    estadoCotiz = r.errores.length
+      ? { txt: `Actualizado a medias: ${r.errores.join(" | ")}`, cls: "err" }
+      : { txt: `Cotizaciones al dia: ${nCCL} fechas de CCL y ${nPr} precios`, cls: "ok" };
+  } catch (e) {
+    estadoCotiz = { txt: "No se pudieron actualizar las cotizaciones: " + e.message, cls: "err" };
+  }
+  refrescando = false;
+  pintarEstadoCotiz();
+}
+
+function pintarEstadoCotiz() {
+  const el = $("estadocot");
+  if (!el) return;
+  if (estadoCotiz === "buscando") { el.className = "log"; el.textContent = "Buscando cotizaciones..."; return; }
+  if (!estadoCotiz) { el.textContent = ""; return; }
+  el.className = "log " + (estadoCotiz.cls || "");
+  el.textContent = estadoCotiz.txt;
 }
 
 function recalcular() {
@@ -322,11 +358,11 @@ function pintarMetricas(){
 /* ------------------------------------------------------------ 4. datos */
 // El panel se redibuja al recalcular, asi que el log se guarda aparte
 // para que el resultado de la importacion no desaparezca de la pantalla.
-let logImport = [], logCotiz = [];
+let logImport = [];
 
 function log(lista, msg, clase=""){
   lista.push(`<span class="${clase}">${msg}</span>`);
-  const el = lista === logImport ? $("logimp") : $("logcot");
+  const el = $("logimp");
   if(el){ el.hidden = false; el.innerHTML = lista.join("<br>"); el.scrollTop = el.scrollHeight; }
 }
 
@@ -363,15 +399,13 @@ function pintarDatos(){
     <div class="card"><h3>Cotizaciones</h3>
       <p class="sub">CCL más reciente que tenés cargado: <b>${nf(CCL[ult])}</b> del ${fdmy(ult)}.
       Precios de ${Object.keys(PRECIOS).length} especies.</p>
-      <div class="acciones"><button class="btn sec" id="actualizar">Intentar actualizar</button></div>
-      <div class="campo">
-        <input type="date" id="fccl" value="${hoyISO()}">
-        <input type="text" id="vccl" placeholder="CCL" inputmode="decimal">
-        <button class="btn" id="setccl">Cargar a mano</button>
+      <div id="estadocot" class="log"></div>
+      <div class="acciones" style="margin-top:10px">
+        <button class="btn sec" id="actualizar">Actualizar ahora</button>
       </div>
-      <div id="logcot" class="log" ${logCotiz.length?"":"hidden"}>${logCotiz.join("<br>")}</div>
-      <p class="sub" style="margin:10px 0 0">Si el navegador bloquea el pedido automático (pasa seguido en
-      el celular), cargá el CCL del día a mano y alcanza para valuar todo.</p>
+      <p class="sub" style="margin:10px 0 0">Se actualizan solas cada vez que abrís la app.
+      Además el repositorio las refresca todos los días, así que aunque abras sin señal
+      vas a tener cotizaciones recientes.</p>
     </div>
 
     <div class="note">
@@ -398,6 +432,8 @@ function pintarDatos(){
       if(!guardar()) log(logImport, "⚠ No se pudo guardar: el almacenamiento del navegador está lleno", "err");
       log(logImport, `Historial: ${LEDGER.length} operaciones`, "ok");
       recalcular();
+      // recien ahora se sabe que especies hay, asi que se piden sus precios
+      refrescarCotizaciones();
     } else {
       log(logImport, "No había operaciones nuevas para agregar.");
     }
@@ -434,34 +470,8 @@ function pintarDatos(){
   };
 
   // cotizaciones
-  $("setccl").onclick = () => {
-    const f = $("fccl").value, v = parseFloat(String($("vccl").value).replace(",","."));
-    if(!f || !v || isNaN(v)) return alert("Poné una fecha y un valor de CCL válidos");
-    CCL[f] = v; guardar(); recalcular();
-  };
-  $("actualizar").onclick = async () => {
-    logCotiz = [];
-    log(logCotiz, "Pidiendo CCL a mercados.ambito.com...");
-    const hoy = new Date(), d = x => String(x).padStart(2,"0");
-    const f2 = `${d(hoy.getDate())}-${d(hoy.getMonth()+1)}-${hoy.getFullYear()}`;
-    const desde = new Date(hoy.getTime()-20*86400000);
-    const f1 = `${d(desde.getDate())}-${d(desde.getMonth()+1)}-${desde.getFullYear()}`;
-    try {
-      const r = await fetch(`https://mercados.ambito.com/dolarrava/cl/historico-general/${f1}/${f2}`);
-      const j = await r.json();
-      let n = 0;
-      j.slice(1).forEach(([f,v])=>{
-        if(!f||!v) return;
-        const [dd,mm,yy] = f.split("/");
-        CCL[`${yy}-${mm}-${dd}`] = parseFloat(String(v).replace(/\./g,"").replace(",","."));
-        n++;
-      });
-      guardar(); recalcular();
-      log(logCotiz, `✓ ${n} días de CCL actualizados`, "ok");
-    } catch(e){
-      log(logCotiz, `✗ El navegador bloqueó el pedido (CORS). Cargá el CCL a mano abajo.`, "err");
-    }
-  };
+  pintarEstadoCotiz();
+  $("actualizar").onclick = () => refrescarCotizaciones(true);
 }
 
 /* ------------------------------------------------------------- arranque */
